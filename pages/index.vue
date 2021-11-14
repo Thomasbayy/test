@@ -43,7 +43,7 @@ export default {
   methods: {
     async fetchData(page, size) {
       const start = page * size
-      await this.delay(3000)
+      await this.delay(200)
       return await sales.results.slice(start, start + size)
     },
     delay(ms) {
