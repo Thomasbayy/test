@@ -1,9 +1,14 @@
 <template>
   <v-data-table
-    :headers="headers"
+    :headers="filteredHeaders"
     :items="items"
     item-key="email"
     class="elevation-1 mt-10"
+    ref="dataTable"
+    :server-items-length="totalItems"
+    :page.sync="pagination.page"
+    @update:options="optionsUpdated"
+    :loading="loading"
   >
     <!-- Above table -->
     <template
@@ -25,7 +30,6 @@
               small
               v-bind="attrs"
               v-on="on"
-
             >
               Toggle columns
             </v-btn>
@@ -109,7 +113,7 @@
               v-for="(option, i) in salesOptions"
               :key="i"
             >
-              {{ option }}
+              {{ option.name }}
             </v-list-item>
           </v-list-item-group>
         </v-card>
@@ -140,6 +144,7 @@
             v-model="countryFilter"
             :items="countryOptions"
             clearable
+            placeholder="Country..."
           ></v-autocomplete>
         </v-card>
       </v-menu>
@@ -174,36 +179,94 @@
       <span class="sales-item">{{ Intl.NumberFormat('en-us', { style: 'currency', currency: 'USD', }).format(item.sales) }}</span>
     </template>
 
+    <!-- Country column -->
+    <template
+      #item.country="{ item }"
+    >
+      <span class="country-item">{{ item.country }} <img class="country-flag" v-if="mappedCountries[item.country]" :src="mappedCountries[item.country].file_url"/> </span>
+    </template>
+
   </v-data-table>
 </template>
 
 <script>
 
 import countries from '@/assets/countries.json';
+import debounce from 'debounce'
 
 export default {
-  props: ['headers', 'items'],
+  props: ['headers', 'items', 'totalItems', 'loading'],
   data() {
     return {
       search: '',
       headerToggledStatus: {},
       countryFilter: '',
       countryOptions: [],
-      yearFilterMin: 1970,
+      mappedCountries: {},
+      yearFilterMin: 1900,
       yearFilterMax: 2021,
-      yearFilter: [1970, 2021],
-      salesOptions: ['Unrestricted', '0 - 149.999', '150.000 - 299.999', '300.000 - 449.000', '450.000 - 599.999', '600.000 - 750.000', '750.000+'],
-      salesFilter: 0
+      yearFilter: [1900, 2021],
+      salesOptions: [
+        {
+          name: 'Unrestricted',
+          value: null
+        }, {
+          name: '0 - 149.999',
+          value: [0, 149999]
+        }, {
+          name: '150.000 - 299.999',
+          value: [150000, 299999]
+        }, {
+          name: '300.000 - 449.999',
+          value: [300000, 449999]
+        }, {
+          name: '450.000 - 599.999',
+          value: [450000, 599999]
+        }, {
+          name: '600.000 - 750.000',
+          value: [600000, 750000]
+        }, {
+          name: '750.000+',
+          value: [750000, 999999999999]
+        }
+      ],
+      salesFilter: 0,
+      pagination: {
+        page: 1,
+        itemsPerPage: 10,
+        sortBy: null,
+        sortDesc: false
+      }
     }
   },
   computed: {
     yearFilterIsModified() {
-      return this.yearFilter[0] !== 1970 || this.yearFilter[1] !== 2021;
-    }
+      return this.yearFilter[0] !== 1900 || this.yearFilter[1] !== 2021;
+    },
+    filteredHeaders() {
+      return this.headers.filter((header) => this.headerToggledStatus[header.value])
+    },
   },
   watch: {
-    search() {
-      this.emitFilters();
+    search: debounce(function (){
+      this.emitFilters(true);
+    }, 500),
+    countryFilter() {
+      this.emitFilters(true);
+    },
+    yearFilter: debounce(function (){
+      this.emitFilters(true);
+    }, 1000),
+    salesFilter() {
+      this.emitFilters(true);
+    },
+    headerToggledStatus: {
+      deep: true,
+      handler(newFilters) {
+        if (!newFilters.country) this.countryFilter = null;
+        if (!newFilters.year) this.yearFilter = [1900, 2021];
+        if (!newFilters.sales) this.salesFilter = 0;
+      }
     }
   },
   mounted() {
@@ -212,16 +275,30 @@ export default {
     }, {});
 
     this.countryOptions = countries.map((country) => country.name);
+    this.mappedCountries = countries.reduce((acc, cur) => {
+      return { ...acc, [cur.name]: cur }
+    }, {});
   },
   methods: {
-    emitFilters() {
+    emitFilters(resetPage = false) {
+      if (resetPage) this.pagination.page = 1;
       this.$emit('filter', {
-        search,
-        countryFilter,
-        yearFilter,
-        salesFilter
+        pagination: this.pagination,
+        search: this.search,
+        countryFilter: this.countryFilter,
+        yearFilter: this.yearFilter,
+        salesFilter: this.salesOptions[this.salesFilter].value
       })
-    }
+    },
+    optionsUpdated({ itemsPerPage, page, sortBy, sortDesc }) {
+      this.pagination = {
+        page,
+        itemsPerPage,
+        sortBy,
+        sortDesc
+      };
+      this.emitFilters();
+    },
   }
 }
 </script>
@@ -269,6 +346,17 @@ export default {
   .sales-selected {
     background-color: #ada9fd;
     border-radius: 4px;
+  }
+
+  .country-item {
+    display: flex;
+    align-items: center;
+  }
+
+  .country-flag {
+    max-width: 20px;
+    max-height: 20px;
+    margin-left: 4px;
   }
 
 </style>
