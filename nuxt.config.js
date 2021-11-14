@@ -37,13 +37,14 @@ export default {
   buildModules: [
     // https://go.nuxtjs.dev/vuetify
     '@nuxtjs/vuetify',
-    
+
   ],
 
   // Modules: https://go.nuxtjs.dev/config-modules
   modules: [
     '@nuxtjs/axios'
   ],
+  target: 'static',
 
   // Vuetify module configuration: https://go.nuxtjs.dev/config-vuetify
   vuetify: {
